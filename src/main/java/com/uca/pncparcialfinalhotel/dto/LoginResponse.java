@@ -1,4 +1,3 @@
 package com.uca.pncparcialfinalhotel.dto;
 
-public class LoginResponse {
-}
+public record LoginResponse(String accessToken, String refreshToken, String rol, String nombreUsuario) {}
