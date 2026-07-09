@@ -3,6 +3,7 @@ package com.uca.pncparcialfinalhotel.service;
 import com.uca.pncparcialfinalhotel.dto.ReservaRequest;
 import com.uca.pncparcialfinalhotel.dto.ReservaResponse;
 import com.uca.pncparcialfinalhotel.exception.ResourceNotFoundException;
+import com.uca.pncparcialfinalhotel.exception.SucursalMismatchException;
 import com.uca.pncparcialfinalhotel.model.*;
 import com.uca.pncparcialfinalhotel.repository.ReservaRepository;
 import com.uca.pncparcialfinalhotel.security.UserPrincipal;
@@ -38,26 +39,42 @@ public class ReservaService {
     }
 
     public List<ReservaResponse> listar(UserPrincipal principal) {
+        if ("RECEPCIONISTA".equals(principal.getRol())) {
+            return reservaRepository.findByHabitacion_Sucursal_Id(principal.getSucursalId())
+                    .stream().map(this::toResponse).toList();
+        }
         return reservaRepository.findAll().stream().map(this::toResponse).toList();
     }
 
     public ReservaResponse confirmar(Long id, UserPrincipal principal) {
         Reserva reserva = obtenerEntidad(id);
+        validarAccesoSucursal(principal, reserva);
         reserva.setEstado(EstadoReserva.CONFIRMADA);
         return toResponse(reservaRepository.save(reserva));
     }
 
     public ReservaResponse cancelar(Long id, UserPrincipal principal) {
         Reserva reserva = obtenerEntidad(id);
+        validarAccesoSucursal(principal, reserva);
         reserva.setEstado(EstadoReserva.CANCELADA);
         return toResponse(reservaRepository.save(reserva));
     }
 
     public ReservaResponse modificar(Long id, ReservaRequest request, UserPrincipal principal) {
         Reserva reserva = obtenerEntidad(id);
+        validarAccesoSucursal(principal, reserva);
         reserva.setFechaInicio(request.fechaInicio());
         reserva.setFechaFin(request.fechaFin());
         return toResponse(reservaRepository.save(reserva));
+    }
+    
+    private void validarAccesoSucursal(UserPrincipal principal, Reserva reserva) {
+        if (!"RECEPCIONISTA".equals(principal.getRol())) return;
+
+        Long sucursalReserva = reserva.getHabitacion().getSucursal().getId();
+        if (!sucursalReserva.equals(principal.getSucursalId())) {
+            throw new SucursalMismatchException("No puede operar sobre reservas de una sucursal distinta a la suya");
+        }
     }
 
     private Reserva obtenerEntidad(Long id) {
